@@ -72,40 +72,45 @@ func (t *Tree) Get(key *big.Int) (*big.Int, error) {
 	return n.Value, nil
 }
 
-func (t *Tree) ProveInclusion(key *big.Int) (*Node, []*big.Int, error) {
+func (t *Tree) ProveInclusion(key *big.Int) (*Proof, error) {
 	i, err := t.keyIndex(key)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	return t.ProveIndex(i)
 }
 
-func (t *Tree) ProveExclusion(key *big.Int) (*Node, []*big.Int, error) {
+func (t *Tree) ProveExclusion(key *big.Int) (*Proof, error) {
 	i, err := t.lowNullifierIndex(key)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	return t.ProveIndex(i)
 }
 
-func (t *Tree) ProveIndex(index uint64) (*Node, []*big.Int, error) {
+func (t *Tree) ProveIndex(index uint64) (*Proof, error) {
 	n, err := t.node(index)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	siblings := make([]*big.Int, t.levels)
+	proof := &Proof{
+		Root:     t.root,
+		Index:    index,
+		Node:     n,
+		Siblings: make([]*big.Int, t.levels),
+	}
 	for level := t.levels; level > 0; index /= 2 {
 		level--
 		siblingIndex := index + 1 - (index%2)*2
-		siblingHashBytes, err := t.tx.Get(t.hashKey(siblingIndex, level))
+		siblingHashBytes, err := t.tx.Get(t.hashKey(siblingIndex, level+1))
 		if err != nil && !errors.Is(err, db.ErrNotFound) {
-			return nil, nil, err
+			return nil, err
 		}
-		siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
+		proof.Siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
 	}
 
-	return n, siblings, nil
+	return proof, nil
 }
 
 func (t *Tree) Insert(key, value *big.Int) error {
@@ -132,17 +137,15 @@ func (t *Tree) Insert(key, value *big.Int) error {
 	size++
 
 	newNode := &Node{
-		NextIndex: ln.NextIndex,
-		Key:       key,
-		Value:     value,
-		NextKey:   ln.NextKey,
+		Key:     key,
+		Value:   value,
+		NextKey: ln.NextKey,
 	}
 	_, err = t.setNode(size, newNode)
 	if err != nil {
 		return err
 	}
 
-	ln.NextIndex = size
 	ln.NextKey = key
 	_, err = t.setNode(lnIndex, ln)
 	if err != nil {
@@ -200,10 +203,9 @@ func (t *Tree) node(index uint64) (*Node, error) {
 	if errors.Is(err, db.ErrNotFound) && index == 0 {
 		// initial state
 		return &Node{
-			NextIndex: 0,
-			Key:       big.NewInt(0),
-			Value:     big.NewInt(0),
-			NextKey:   big.NewInt(0),
+			Key:     big.NewInt(0),
+			Value:   big.NewInt(0),
+			NextKey: big.NewInt(0),
 		}, nil
 	} else if err != nil {
 		return nil, err
@@ -222,15 +224,20 @@ func (t *Tree) setNode(index uint64, n *Node) ([]*big.Int, error) {
 		return nil, err
 	}
 
-	siblings := make([]*big.Int, t.levels)
 	h, err := n.hash(t.hash)
 	if err != nil {
 		return nil, err
 	}
-	for level := t.levels; level > 0; index /= 2 {
+	err = t.tx.Set(t.hashKey(index, t.levels), h.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	siblings := make([]*big.Int, t.levels)
+	for level := t.levels; level > 0; {
 		level--
 		siblingIndex := index + 1 - (index%2)*2
-		siblingHashBytes, err := t.tx.Get(t.hashKey(siblingIndex, level))
+		siblingHashBytes, err := t.tx.Get(t.hashKey(siblingIndex, level+1))
 		siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
 		if err == nil {
 			if index%2 == 0 {
@@ -244,11 +251,16 @@ func (t *Tree) setNode(index uint64, n *Node) ([]*big.Int, error) {
 		} else if !errors.Is(err, db.ErrNotFound) {
 			return nil, err
 		}
+
+		index /= 2
 		err = t.tx.Set(t.hashKey(index, level), h.Bytes())
 		if err != nil {
 			return nil, err
 		}
 		if level == 0 {
+			if index != 0 {
+				return nil, errors.New("tree is over capacity")
+			}
 			t.root = h
 		}
 	}

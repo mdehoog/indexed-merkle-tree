@@ -1,16 +1,14 @@
 package imt
 
 import (
-	"encoding/binary"
 	"errors"
 	"math/big"
 )
 
 type Node struct {
-	Key       *big.Int
-	Value     *big.Int
-	NextKey   *big.Int
-	NextIndex uint64
+	Key     *big.Int
+	Value   *big.Int
+	NextKey *big.Int
 }
 
 func (n *Node) bytes() []byte {
@@ -23,8 +21,7 @@ func (n *Node) bytes() []byte {
 	b = append(b, vb...)
 	nkb := n.NextKey.Bytes()
 	b = append(b, byte(len(nkb)))
-	b = append(b, nkb...)
-	return binary.BigEndian.AppendUint64(b, n.NextIndex)
+	return append(b, nkb...)
 }
 
 func (n *Node) fromBytes(b []byte) error {
@@ -42,11 +39,9 @@ func (n *Node) fromBytes(b []byte) error {
 		return errors.New("invalid bytes")
 	}
 	n.NextKey = new(big.Int).SetBytes(b[1 : 1+b[0]])
-	b = b[1+b[0]:]
-	n.NextIndex = binary.BigEndian.Uint64(b)
 	return nil
 }
 
 func (n *Node) hash(h HashFn) (*big.Int, error) {
-	return h([]*big.Int{n.Key, n.Value, n.NextKey, new(big.Int).SetUint64(n.NextIndex)})
+	return h([]*big.Int{n.Key, n.Value, n.NextKey})
 }
