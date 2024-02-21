@@ -32,3 +32,23 @@ func (p *Proof) Valid(t *Tree) (bool, error) {
 	}
 	return h.Cmp(p.Root) == 0, nil
 }
+
+type MutateProof struct {
+	OldRoot     *big.Int
+	OldSiblings []*big.Int
+	NewRoot     *big.Int
+	Node        *Node
+	Index       uint64
+	Siblings    []*big.Int
+	LowNode     *Node // LowNode.Value == OldValue for updates
+	LowIndex    uint64
+	LowSiblings []*big.Int
+	Update      bool
+}
+
+func (p *MutateProof) UpdateVariable() int {
+	if p.Update {
+		return 1
+	}
+	return 0
+}

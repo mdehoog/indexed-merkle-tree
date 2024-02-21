@@ -37,7 +37,18 @@ func NewTree(tx db.Transaction, levels, feLen uint64, hash HashFn) *Tree {
 func (t *Tree) Root() (*big.Int, error) {
 	if t.root == nil {
 		rootBytes, err := t.tx.Get(t.hashKey(0, 0))
-		if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			// initial state: hash of empty node
+			initialHash, err := (&Node{
+				Key:     big.NewInt(0),
+				Value:   big.NewInt(0),
+				NextKey: big.NewInt(0),
+			}).hash(t.hash)
+			if err != nil {
+				return nil, err
+			}
+			rootBytes = initialHash.Bytes()
+		} else if err != nil {
 			return nil, err
 		}
 		t.root = new(big.Int).SetBytes(rootBytes)
@@ -113,64 +124,134 @@ func (t *Tree) ProveIndex(index uint64) (*Proof, error) {
 	return proof, nil
 }
 
-func (t *Tree) Insert(key, value *big.Int) error {
+func (t *Tree) Insert(key, value *big.Int) (*MutateProof, error) {
 	_, err := t.tx.Get(t.indexKey(key))
 	if err == nil {
-		return errors.New("key already exists")
+		return nil, errors.New("key already exists")
 	} else if !errors.Is(err, db.ErrNotFound) {
-		return err
+		return nil, err
 	}
 
-	lnIndex, err := t.lowNullifierIndex(key)
+	lowIndex, err := t.lowNullifierIndex(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	ln, err := t.node(lnIndex)
+	lowNode, err := t.node(lowIndex)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	oldProof, err := t.ProveIndex(lowIndex)
+	if err != nil {
+		return nil, err
 	}
 
 	size, err := t.Size()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	size++
+
+	oldRoot, err := t.Root()
+	if err != nil {
+		return nil, err
+	}
 
 	newNode := &Node{
 		Key:     key,
 		Value:   value,
-		NextKey: ln.NextKey,
+		NextKey: lowNode.NextKey,
 	}
 	_, err = t.setNode(size, newNode)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	ln.NextKey = key
-	_, err = t.setNode(lnIndex, ln)
+	lowNode.NextKey = key
+	_, err = t.setNode(lowIndex, lowNode)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = t.setKeyIndex(key, size)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return t.setSize(size)
+	err = t.setSize(size)
+	if err != nil {
+		return nil, err
+	}
+
+	newRoot, err := t.Root()
+	if err != nil {
+		return nil, err
+	}
+	proof, err := t.ProveIndex(size)
+	if err != nil {
+		return nil, err
+	}
+	lowProof, err := t.ProveIndex(lowIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MutateProof{
+		OldRoot:     oldRoot,
+		OldSiblings: oldProof.Siblings,
+		NewRoot:     newRoot,
+		Node:        newNode,
+		Index:       size,
+		Siblings:    proof.Siblings,
+		LowNode:     lowNode,
+		LowIndex:    lowIndex,
+		LowSiblings: lowProof.Siblings,
+		Update:      false,
+	}, nil
 }
 
-func (t *Tree) Update(key, value *big.Int) error {
+func (t *Tree) Update(key, value *big.Int) (*MutateProof, error) {
+	oldRoot, err := t.Root()
+	if err != nil {
+		return nil, err
+	}
 	i, err := t.keyIndex(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	n, err := t.node(i)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	oldValue := n.Value
 	n.Value = value
 	_, err = t.setNode(i, n)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	newRoot, err := t.Root()
+	if err != nil {
+		return nil, err
+	}
+	proof, err := t.ProveIndex(i)
+	if err != nil {
+		return nil, err
+	}
+	return &MutateProof{
+		OldRoot:     oldRoot,
+		OldSiblings: proof.Siblings,
+		NewRoot:     newRoot,
+		Node:        n,
+		Index:       i,
+		Siblings:    proof.Siblings,
+		LowNode: &Node{
+			Key:     n.Key,
+			Value:   oldValue,
+			NextKey: n.NextKey,
+		},
+		LowIndex:    i,
+		LowSiblings: proof.Siblings,
+		Update:      true,
+	}, nil
 }
 
 func (t *Tree) setSize(s uint64) error {
