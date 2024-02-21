@@ -13,8 +13,7 @@ func VerifyExclusion(api frontend.API, enabled, root, key, prevKey, value, nextK
 	Verify(api, enabled, root, key, prevKey, value, nextKey, index, 1, siblings)
 }
 
-func Verify(api frontend.API, enabled, root, key, prevKey, value, nextKey, index, exclusion frontend.Variable, siblings []frontend.Variable) {
-	inclusion := api.Sub(1, exclusion)
+func Verify(api frontend.API, enabled, root, key, prevKey, value, nextKey, index, inclusion frontend.Variable, siblings []frontend.Variable) {
 	prevKeyEqualsKey := api.IsZero(api.Sub(prevKey, key))
 	AssertEqualIfEnabled(api, prevKeyEqualsKey, inclusion, enabled) // inclusion ? key == prevKey : key != prevKey
 	AssertDifferentIfEnabled(api, key, nextKey, enabled)            // key != nextKey
