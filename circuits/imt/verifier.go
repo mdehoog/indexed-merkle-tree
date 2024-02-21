@@ -22,13 +22,11 @@ func Verify(api frontend.API, enabled, root, key, lowKey, value, nextKey, index,
 	nextKeyOverflow := api.Sub(nextKey, api.IsZero(nextKey))        // nextKey == 0 ? nextKey - 1 : nextKey
 	api.AssertIsLessOrEqual(api.Mul(enabled, key), nextKeyOverflow) // key <= nextKey
 
-	indexBin := api.ToBinary(index, len(siblings))
+	indexBits := api.ToBinary(index, len(siblings))
 	h := poseidon.Hash(api, []frontend.Variable{lowKey, value, nextKey})
-	for level := len(siblings) - 1; level >= 0; level-- {
-		i := indexBin[len(siblings)-1-level]
-		l := api.Select(i, h, siblings[level])
-		r := api.Select(i, siblings[level], h)
-		h = api.Select(api.IsZero(siblings[level]), h, poseidon.Hash(api, []frontend.Variable{l, r}))
+	for i := 0; i < len(siblings); i++ {
+		level := len(siblings) - i - 1
+		h = HashSwitcher(api, indexBits[i], h, siblings[level])
 	}
 	AssertEqualIfEnabled(api, h, root, enabled)
 }
@@ -39,4 +37,10 @@ func AssertEqualIfEnabled(api frontend.API, a, b, enabled frontend.Variable) {
 
 func AssertDifferentIfEnabled(api frontend.API, a, b, enabled frontend.Variable) {
 	api.AssertIsEqual(api.Mul(enabled, api.IsZero(api.Sub(a, b))), 0)
+}
+
+func HashSwitcher(api frontend.API, indexBit, hash, sibling frontend.Variable) frontend.Variable {
+	l := api.Select(indexBit, hash, sibling)
+	r := api.Select(indexBit, sibling, hash)
+	return api.Select(api.IsZero(sibling), hash, poseidon.Hash(api, []frontend.Variable{l, r}))
 }
