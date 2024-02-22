@@ -8,10 +8,10 @@ import (
 type Mutate struct {
 	Enabled     frontend.Variable
 	OldRoot     frontend.Variable
+	OldSize     frontend.Variable
 	Key         frontend.Variable
 	Value       frontend.Variable
 	NextKey     frontend.Variable
-	Index       frontend.Variable
 	Siblings    []frontend.Variable
 	LowKey      frontend.Variable
 	LowValue    frontend.Variable
@@ -27,12 +27,13 @@ func (p Mutate) NewRoot(api frontend.API) frontend.Variable {
 
 	updateAndEnabled := api.And(p.Update, p.Enabled)
 	assertEqualIfEnabled(api, p.Key, p.LowKey, updateAndEnabled)
-	assertEqualIfEnabled(api, p.Index, p.LowIndex, updateAndEnabled)
 	lowValueUpdate := api.Select(p.Update, p.Value, p.LowValue)
+	size := api.Add(p.OldSize, api.IsZero(p.Update))
+	index := api.Select(p.Update, p.LowIndex, size)
 
 	lowNextKey := api.Select(p.Update, p.NextKey, p.Key)
-	h := updateNode(api, p.Key, p.Value, p.NextKey, p.Index, p.Siblings)
-	lowH := updateNode(api, p.LowKey, lowValueUpdate, lowNextKey, p.LowIndex, p.LowSiblings)
+	h := updateNode(api, size, p.Key, p.Value, p.NextKey, index, p.Siblings)
+	lowH := updateNode(api, size, p.LowKey, lowValueUpdate, lowNextKey, p.LowIndex, p.LowSiblings)
 
 	assertEqualIfEnabled(api, h, lowH, p.Enabled)
 
@@ -51,6 +52,7 @@ func (p MutateWithVerify) NewRoot(api frontend.API) frontend.Variable {
 	Verify{
 		Enabled:   p.Enabled,
 		Root:      p.OldRoot,
+		Size:      p.OldSize,
 		Key:       p.Key,
 		Value:     p.LowValue,
 		Index:     p.LowIndex,
@@ -62,12 +64,13 @@ func (p MutateWithVerify) NewRoot(api frontend.API) frontend.Variable {
 	return p.Mutate.NewRoot(api)
 }
 
-func updateNode(api frontend.API, key, value, nextKey, index frontend.Variable, siblings []frontend.Variable) frontend.Variable {
+func updateNode(api frontend.API, size, key, value, nextKey, index frontend.Variable, siblings []frontend.Variable) frontend.Variable {
 	indexBits := api.ToBinary(index, len(siblings))
 	h := poseidon.Hash(api, []frontend.Variable{key, value, nextKey})
 	for i := 0; i < len(siblings); i++ {
 		level := len(siblings) - i - 1
 		h = hashSwitcher(api, indexBits[i], h, siblings[level])
 	}
+	h = poseidon.Hash(api, []frontend.Variable{h, size})
 	return h
 }

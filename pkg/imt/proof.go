@@ -6,6 +6,7 @@ import (
 
 type Proof struct {
 	Root     *big.Int
+	Size     uint64
 	Index    uint64
 	Node     *Node
 	Siblings []*big.Int
@@ -30,15 +31,19 @@ func (p *Proof) Valid(t *Tree) (bool, error) {
 			}
 		}
 	}
+	h, err = t.hash([]*big.Int{h, new(big.Int).SetUint64(p.Size)})
+	if err != nil {
+		return false, err
+	}
 	return h.Cmp(p.Root) == 0, nil
 }
 
 type MutateProof struct {
 	OldRoot     *big.Int
+	OldSize     uint64
 	OldSiblings []*big.Int
 	NewRoot     *big.Int
 	Node        *Node
-	Index       uint64
 	Siblings    []*big.Int
 	LowNode     *Node // LowNode.Value == OldValue for updates
 	LowIndex    uint64

@@ -5,6 +5,7 @@ import "github.com/consensys/gnark/frontend"
 type Exclusion struct {
 	Enabled    frontend.Variable
 	Root       frontend.Variable
+	Size       frontend.Variable
 	Key        frontend.Variable
 	Index      frontend.Variable
 	LowKey     frontend.Variable
@@ -17,6 +18,7 @@ func (v Exclusion) Run(api frontend.API) {
 	Verify{
 		Enabled:   v.Enabled,
 		Root:      v.Root,
+		Size:      v.Size,
 		Key:       v.Key,
 		Value:     v.LowValue,
 		Index:     v.Index,

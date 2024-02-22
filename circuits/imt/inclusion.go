@@ -5,6 +5,7 @@ import "github.com/consensys/gnark/frontend"
 type Inclusion struct {
 	Enabled  frontend.Variable
 	Root     frontend.Variable
+	Size     frontend.Variable
 	Key      frontend.Variable
 	Value    frontend.Variable
 	Index    frontend.Variable
@@ -16,6 +17,7 @@ func (v Inclusion) Run(api frontend.API) {
 	Verify{
 		Enabled:   v.Enabled,
 		Root:      v.Root,
+		Size:      v.Size,
 		Key:       v.Key,
 		Value:     v.Value,
 		Index:     v.Index,

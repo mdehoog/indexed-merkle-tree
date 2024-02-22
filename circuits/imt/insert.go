@@ -5,10 +5,10 @@ import "github.com/consensys/gnark/frontend"
 type Insert struct {
 	Enabled     frontend.Variable
 	OldRoot     frontend.Variable
+	OldSize     frontend.Variable
 	Key         frontend.Variable
 	Value       frontend.Variable
 	NextKey     frontend.Variable
-	Index       frontend.Variable
 	Siblings    []frontend.Variable
 	LowKey      frontend.Variable
 	LowValue    frontend.Variable
@@ -20,10 +20,10 @@ func (p Insert) NewRoot(api frontend.API) frontend.Variable {
 	return Mutate{
 		Enabled:     p.Enabled,
 		OldRoot:     p.OldRoot,
+		OldSize:     p.OldSize,
 		Key:         p.Key,
 		Value:       p.Value,
 		NextKey:     p.NextKey,
-		Index:       p.Index,
 		Siblings:    p.Siblings,
 		LowKey:      p.LowKey,
 		LowValue:    p.LowValue,
@@ -43,10 +43,10 @@ func (p InsertWithVerify) NewRoot(api frontend.API) frontend.Variable {
 		Mutate: Mutate{
 			Enabled:     p.Enabled,
 			OldRoot:     p.OldRoot,
+			OldSize:     p.OldSize,
 			Key:         p.Key,
 			Value:       p.Value,
 			NextKey:     p.NextKey,
-			Index:       p.Index,
 			Siblings:    p.Siblings,
 			LowKey:      p.LowKey,
 			LowValue:    p.LowValue,

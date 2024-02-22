@@ -8,6 +8,7 @@ import (
 type Verify struct {
 	Enabled   frontend.Variable
 	Root      frontend.Variable
+	Size      frontend.Variable
 	Key       frontend.Variable
 	Value     frontend.Variable
 	Index     frontend.Variable
@@ -32,5 +33,6 @@ func (v Verify) Run(api frontend.API) {
 		level := len(v.Siblings) - i - 1
 		h = hashSwitcher(api, indexBits[i], h, v.Siblings[level])
 	}
+	h = poseidon.Hash(api, []frontend.Variable{h, v.Size})
 	assertEqualIfEnabled(api, h, v.Root, v.Enabled)
 }
