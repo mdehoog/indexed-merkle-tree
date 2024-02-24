@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/mdehoog/gnark-indexed-merkle-tree/pkg/db"
+	"github.com/mdehoog/indexed-merkle-tree/db"
 )
 
 const indexKeyPrefix = byte(1)
