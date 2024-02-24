@@ -6,8 +6,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.0
 	github.com/consensys/gnark v0.9.2-0.20240219152507-45d201aad0c4
 	github.com/consensys/gnark-crypto v0.12.2-0.20240215234832-d72fcb379d3e
-	github.com/iden3/go-iden3-crypto v0.0.16
-	github.com/mdehoog/gnark-circom-smt v0.0.0-20240213072121-8b75e8332ee3
+	github.com/mdehoog/poseidon v0.0.0-20240224081335-4b88609ec4f8
 )
 
 require (
@@ -49,7 +48,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

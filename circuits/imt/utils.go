@@ -2,7 +2,7 @@ package imt
 
 import (
 	"github.com/consensys/gnark/frontend"
-	"github.com/mdehoog/gnark-circom-smt/circuits/poseidon"
+	"github.com/mdehoog/poseidon/circuits/poseidon"
 )
 
 func assertEqualIfEnabled(api frontend.API, a, b, enabled frontend.Variable) {
