@@ -10,9 +10,9 @@ type Verify struct {
 	Root      frontend.Variable
 	Size      frontend.Variable
 	Key       frontend.Variable
-	Value     frontend.Variable
+	Value     frontend.Variable // exclusion: use LowValue
 	Index     frontend.Variable
-	NextKey   frontend.Variable
+	NextKey   frontend.Variable // exclusion: use LowNextKey
 	LowKey    frontend.Variable
 	Siblings  []frontend.Variable
 	Inclusion frontend.Variable

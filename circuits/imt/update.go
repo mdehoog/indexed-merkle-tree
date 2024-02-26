@@ -4,8 +4,8 @@ import "github.com/consensys/gnark/frontend"
 
 type Update struct {
 	Enabled  frontend.Variable
-	OldRoot  frontend.Variable
 	Size     frontend.Variable
+	OldRoot  frontend.Variable
 	Key      frontend.Variable
 	Value    frontend.Variable
 	NextKey  frontend.Variable
@@ -26,8 +26,8 @@ type UpdateWithVerify struct {
 func (p UpdateWithVerify) NewRoot(api frontend.API) frontend.Variable {
 	Verify{
 		Enabled:   p.Enabled,
-		Root:      p.OldRoot,
 		Size:      p.Size,
+		Root:      p.OldRoot,
 		Key:       p.Key,
 		Value:     p.OldValue,
 		Index:     p.Index,

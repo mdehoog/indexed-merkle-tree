@@ -7,16 +7,16 @@ import (
 
 type Mutate struct {
 	Enabled     frontend.Variable
+	OldSize     frontend.Variable // updates: use Size
 	OldRoot     frontend.Variable
-	OldSize     frontend.Variable
 	Key         frontend.Variable
 	Value       frontend.Variable
 	NextKey     frontend.Variable
 	Siblings    []frontend.Variable
-	LowKey      frontend.Variable
-	LowValue    frontend.Variable
-	LowIndex    frontend.Variable
-	LowSiblings []frontend.Variable
+	LowKey      frontend.Variable   // updates: same as Key
+	LowValue    frontend.Variable   // updates: use OldValue
+	LowIndex    frontend.Variable   // updates: use Index
+	LowSiblings []frontend.Variable // updates: same as Siblings
 	Update      frontend.Variable
 }
 
@@ -51,8 +51,8 @@ func (p MutateWithVerify) NewRoot(api frontend.API) frontend.Variable {
 	}
 	Verify{
 		Enabled:   p.Enabled,
-		Root:      p.OldRoot,
 		Size:      p.OldSize,
+		Root:      p.OldRoot,
 		Key:       p.Key,
 		Value:     p.LowValue,
 		Index:     p.LowIndex,
