@@ -3,7 +3,7 @@
 Golang + Gnark implementation of an indexed merkle tree, as described in
 [Aztec's documentation](https://docs.aztec.network/learn/concepts/storage/trees/indexed_merkle_tree).
 
-There are two differences between this implementation and the one described in the Aztec documentation:
+There are two differences between the one described in the Aztec documentation and this implementation:
 1. The Aztec version stores the `[value, nextIndex, nextValue]` in the leaf nodes, whereas this implementation 
    stores `[key, value, nextKey]`.
 2. This implementation performs an additional hash of the root node with the `size` of the tree to generate the
