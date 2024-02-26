@@ -40,7 +40,7 @@ type ExclusionCircuit struct {
 }
 
 func (c *ExclusionCircuit) Define(api frontend.API) error {
-    imt.Exclusion{
+	imt.Exclusion{
 		Enabled:    1,
 		Root:       c.Root,
 		Size:       c.Size,
@@ -63,7 +63,7 @@ type InclusionCircuit struct {
 }
 
 func (c *InclusionCircuit) Define(api frontend.API) error {
-    imt.Inclusion{
+	imt.Inclusion{
 		Enabled:  1,
 		Root:     c.Root,
 		Size:     c.Size,
@@ -85,7 +85,7 @@ type VerifyCircuit struct {
 }
 
 func (c *VerifyCircuit) Define(api frontend.API) error {
-    imt.Verify{
+	imt.Verify{
 		Enabled:   1,
 		Root:      c.Root,
 		Size:      c.Size,
@@ -114,7 +114,7 @@ func (c *InsertCircuit) Define(api frontend.API) error {
 	newRoot := imt.InsertWithVerify{
 		Insert: imt.Insert{
 			Enabled:     1,
-            OldSize:     c.OldSize,
+			OldSize:     c.OldSize,
 			OldRoot:     c.OldRoot,
 			Key:         c.Key,
 			Value:       c.Value,
@@ -167,21 +167,21 @@ type MutateCircuit struct {
 
 func (c *MutateCircuit) Define(api frontend.API) error {
    newRoot := imt.MutateWithVerify{
-      Mutate: imt.Mutate{
-         Enabled:     1,
-         OldSize:     c.OldSize,
-         OldRoot:     c.OldRoot,
-         Key:         c.Key,
-         Value:       c.Value,
-         NextKey:     c.NextKey,
-         Siblings:    c.Siblings,
-         LowKey:      c.LowKey,
-         LowValue:    c.LowValue,
-         LowIndex:    c.LowIndex,
-         LowSiblings: c.LowSiblings,
-         Update:      c.Update,
-      },
-      OldSiblings: c.OldSiblings,
+	  Mutate: imt.Mutate{
+		 Enabled:     1,
+		 OldSize:     c.OldSize,
+		 OldRoot:     c.OldRoot,
+		 Key:         c.Key,
+		 Value:       c.Value,
+		 NextKey:     c.NextKey,
+		 Siblings:    c.Siblings,
+		 LowKey:      c.LowKey,
+		 LowValue:    c.LowValue,
+		 LowIndex:    c.LowIndex,
+		 LowSiblings: c.LowSiblings,
+		 Update:      c.Update,
+	  },
+	  OldSiblings: c.OldSiblings,
    }.NewRoot(api)
    api.AssertIsEqual(newRoot, c.NewRoot)
    return nil
