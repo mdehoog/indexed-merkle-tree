@@ -396,11 +396,11 @@ func (t *Tree) zeroIndexKey() []byte {
 }
 
 func (t *Tree) hashKey(index, level uint64) []byte {
-	total := new(big.Int).Lsh(big.NewInt(1), uint(t.levels+1))
-	start := new(big.Int).Lsh(big.NewInt(1), uint(level+2))
-	total.Sub(total, start)
-	total.Add(total, new(big.Int).SetUint64(index))
-	return append([]byte{hashKeyPrefix}, total.Bytes()...)
+	one := big.NewInt(1)
+	position := new(big.Int).Lsh(one, uint(t.levels+1))
+	position.Sub(position, new(big.Int).Lsh(one, uint(level+2)))
+	position.Add(position, new(big.Int).SetUint64(index))
+	return append([]byte{hashKeyPrefix}, position.Bytes()...)
 }
 
 func (t *Tree) nodeKey(key *big.Int) []byte {
