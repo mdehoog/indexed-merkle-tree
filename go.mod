@@ -3,7 +3,7 @@ module github.com/mdehoog/indexed-merkle-tree
 go 1.21.1
 
 require (
-	github.com/cockroachdb/pebble v1.1.0
+	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/consensys/gnark v0.9.2-0.20240219152507-45d201aad0c4
 	github.com/consensys/gnark-crypto v0.12.2-0.20240215234832-d72fcb379d3e
 	github.com/mdehoog/poseidon v0.0.0-20240224232113-d985a7c5e5b2
