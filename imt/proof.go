@@ -12,7 +12,7 @@ type Proof struct {
 	Siblings []*big.Int
 }
 
-func (p *Proof) Valid(t *Tree) (bool, error) {
+func (p *Proof) Valid(t *TreeReader) (bool, error) {
 	h, err := p.Node.hash(t.hash)
 	if err != nil {
 		return false, err

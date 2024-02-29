@@ -21,7 +21,7 @@ temp, _ := os.MkdirTemp("", "*")
 pDb, _ := pebble.Open(temp, &pebble.Options{})
 imtDb := db.NewPebble(pDb)
 tx := imtDb.NewTransaction()
-tree := imt.NewTree(tx, levels, fr.Bytes, poseidon.Hash[*fr.Element])
+tree := imt.NewTreeWriter(tx, levels, fr.Bytes, poseidon.Hash[*fr.Element])
 
 key := big.NewInt(123)
 exclusionProof, _ := tree.ProveExclusion(key)
