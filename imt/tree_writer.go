@@ -31,6 +31,18 @@ func (t *TreeWriter) setSize(s uint64) error {
 	return t.tx.Set(sizeKey, new(big.Int).SetUint64(s).Bytes())
 }
 
+func (t *TreeWriter) Set(key, value *big.Int) (*MutateProof, error) {
+	_, err := t.Get(key)
+	insert := errors.Is(err, db.ErrNotFound)
+	if err != nil && !insert {
+		return nil, err
+	}
+	if insert {
+		return t.Insert(key, value)
+	}
+	return t.Update(key, value)
+}
+
 func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	_, err := t.tx.Get(t.indexKey(key))
 	if err == nil {
