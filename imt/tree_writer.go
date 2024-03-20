@@ -27,7 +27,6 @@ func NewTreeWriter(tx db.Transaction, levels, feLen uint64, hash HashFn) *TreeWr
 }
 
 func (t *TreeWriter) setSize(s uint64) error {
-	t.size = &s
 	return t.tx.Set(sizeKey, new(big.Int).SetUint64(s).Bytes())
 }
 
@@ -220,14 +219,8 @@ func (t *TreeWriter) setNode(index uint64, n *Node) ([]*big.Int, error) {
 		if err != nil {
 			return nil, err
 		}
-		if level == 0 {
-			if index != 0 {
-				return nil, errors.New("tree is over capacity")
-			}
-			err = t.setRootFromRootNode(h)
-			if err != nil {
-				return nil, err
-			}
+		if level == 0 && index != 0 {
+			return nil, errors.New("tree is over capacity")
 		}
 	}
 

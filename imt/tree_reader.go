@@ -19,8 +19,6 @@ type TreeReader struct {
 	levels uint64
 	feLen  uint64
 	hash   HashFn
-	root   *big.Int
-	size   *uint64
 }
 
 func NewTreeReader(reader db.Reader, levels, feLen uint64, hash HashFn) *TreeReader {
@@ -33,39 +31,36 @@ func NewTreeReader(reader db.Reader, levels, feLen uint64, hash HashFn) *TreeRea
 }
 
 func (t *TreeReader) Root() (*big.Int, error) {
-	if t.root == nil {
-		rootNodeBytes, err := t.reader.Get(t.hashKey(0, 0))
-		if errors.Is(err, db.ErrNotFound) {
-			// initial state: hash of empty node
-			initialHash, err := t.initialStateNode().hash(t.hash)
-			if err != nil {
-				return nil, err
-			}
-			rootNodeBytes = initialHash.Bytes()
-		} else if err != nil {
-			return nil, err
-		}
-		err = t.setRootFromRootNode(new(big.Int).SetBytes(rootNodeBytes))
+	rootNodeBytes, err := t.reader.Get(t.hashKey(0, 0))
+	if errors.Is(err, db.ErrNotFound) {
+		// initial state: hash of empty node
+		initialHash, err := t.initialStateNode().hash(t.hash)
 		if err != nil {
 			return nil, err
 		}
+		rootNodeBytes = initialHash.Bytes()
+	} else if err != nil {
+		return nil, err
 	}
-	return t.root, nil
+
+	// hash the root node with the size to calculate the final tree root
+	size, err := t.Size()
+	if err != nil {
+		return nil, err
+	}
+	return t.hash([]*big.Int{new(big.Int).SetBytes(rootNodeBytes), new(big.Int).SetUint64(size)})
 }
 
 func (t *TreeReader) Size() (uint64, error) {
-	if t.size == nil {
-		s, err := t.reader.Get(sizeKey)
-		if err == nil {
-			b := new(big.Int).SetBytes(s).Uint64()
-			t.size = &b
-		} else if errors.Is(err, db.ErrNotFound) {
-			t.size = new(uint64)
-		} else {
-			return 0, err
-		}
+	s, err := t.reader.Get(sizeKey)
+	if err == nil {
+		b := new(big.Int).SetBytes(s).Uint64()
+		return b, nil
+	} else if errors.Is(err, db.ErrNotFound) {
+		return 0, nil
+	} else {
+		return 0, err
 	}
-	return *t.size, nil
 }
 
 func (t *TreeReader) Get(key *big.Int) (*big.Int, error) {
@@ -193,18 +188,4 @@ func (t *TreeReader) hashKey(index, level uint64) []byte {
 
 func (t *TreeReader) nodeKey(key *big.Int) []byte {
 	return append([]byte{nodeKeyPrefix}, key.Bytes()...)
-}
-
-func (t *TreeReader) setRootFromRootNode(h *big.Int) error {
-	size, err := t.Size()
-	if err != nil {
-		return err
-	}
-	// hash the root node with the size to calculate the final tree root
-	root, err := t.hash([]*big.Int{h, new(big.Int).SetUint64(size)})
-	if err != nil {
-		return err
-	}
-	t.root = root
-	return nil
 }
