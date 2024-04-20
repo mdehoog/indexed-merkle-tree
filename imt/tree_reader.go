@@ -181,7 +181,7 @@ func (t *TreeReader) zeroIndexKey() []byte {
 func (t *TreeReader) hashKey(index, level uint64) []byte {
 	one := big.NewInt(1)
 	position := new(big.Int).Lsh(one, uint(t.levels+1))
-	position.Sub(position, new(big.Int).Lsh(one, uint(level+2)))
+	position.Sub(position, new(big.Int).Lsh(one, uint(level+1)))
 	position.Add(position, new(big.Int).SetUint64(index))
 	return append([]byte{hashKeyPrefix}, position.Bytes()...)
 }
