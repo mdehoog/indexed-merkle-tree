@@ -16,7 +16,7 @@ type Reader interface {
 	Get(key []byte) ([]byte, error)
 
 	// GetLT retrieves the key/value less than the given key.
-	GetLT(key, limit []byte) ([]byte, []byte, error)
+	GetLT(key []byte) ([]byte, []byte, error)
 }
 
 type Transaction interface {

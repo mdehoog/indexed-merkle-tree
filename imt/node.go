@@ -1,21 +1,39 @@
 package imt
 
 import (
+	"encoding/binary"
 	"errors"
 	"math/big"
 )
 
 type Node struct {
 	Key     *big.Int
+	Index   uint64
 	Value   *big.Int
 	NextKey *big.Int
 }
 
+func initialStateNode() *Node {
+	return &Node{
+		Key:     new(big.Int),
+		Index:   0,
+		Value:   new(big.Int),
+		NextKey: new(big.Int),
+	}
+}
+
+func bytesToNode(key *big.Int, b []byte) (*Node, error) {
+	n := &Node{}
+	err := n.fromBytes(key, b)
+	if err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
 func (n *Node) bytes() []byte {
 	var b []byte
-	kb := n.Key.Bytes()
-	b = append(b, byte(len(kb)))
-	b = append(b, kb...)
+	b = binary.BigEndian.AppendUint64(b, n.Index)
 	vb := n.Value.Bytes()
 	b = append(b, byte(len(vb)))
 	b = append(b, vb...)
@@ -24,12 +42,13 @@ func (n *Node) bytes() []byte {
 	return append(b, nkb...)
 }
 
-func (n *Node) fromBytes(b []byte) error {
-	if len(b) < 1 {
+func (n *Node) fromBytes(key *big.Int, b []byte) error {
+	n.Key = key
+	if len(b) < 8 {
 		return errors.New("invalid bytes")
 	}
-	n.Key = new(big.Int).SetBytes(b[1 : 1+b[0]])
-	b = b[1+b[0]:]
+	n.Index = binary.BigEndian.Uint64(b)
+	b = b[8:]
 	if len(b) < 1 {
 		return errors.New("invalid bytes")
 	}

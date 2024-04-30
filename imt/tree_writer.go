@@ -43,23 +43,19 @@ func (t *TreeWriter) Set(key, value *big.Int) (*MutateProof, error) {
 }
 
 func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
-	_, err := t.tx.Get(t.indexKey(key))
+	_, err := t.tx.Get(t.nodeKey(key))
 	if err == nil {
 		return nil, errors.New("key already exists")
 	} else if !errors.Is(err, db.ErrNotFound) {
 		return nil, err
 	}
 
-	lowIndex, err := t.lowNullifierIndex(key)
-	if err != nil {
-		return nil, err
-	}
-	lowNode, err := t.node(lowIndex)
+	lowNode, err := t.lowNullifierNode(key)
 	if err != nil {
 		return nil, err
 	}
 
-	oldProof, err := t.ProveIndex(lowIndex)
+	oldProof, err := t.ProveNode(lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -75,10 +71,6 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	}
 	size++
 
-	err = t.setKeyIndex(key, size)
-	if err != nil {
-		return nil, err
-	}
 	err = t.setSize(size)
 	if err != nil {
 		return nil, err
@@ -86,16 +78,17 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 
 	newNode := &Node{
 		Key:     key,
+		Index:   size,
 		Value:   value,
 		NextKey: lowNode.NextKey,
 	}
-	_, err = t.setNode(size, newNode)
+	_, err = t.setNode(newNode)
 	if err != nil {
 		return nil, err
 	}
 
 	lowNode.NextKey = key
-	_, err = t.setNode(lowIndex, lowNode)
+	_, err = t.setNode(lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +97,11 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	proof, err := t.ProveIndex(size)
+	proof, err := t.ProveNode(newNode)
 	if err != nil {
 		return nil, err
 	}
-	lowProof, err := t.ProveIndex(lowIndex)
+	lowProof, err := t.ProveNode(lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +114,6 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 		Node:        newNode,
 		Siblings:    proof.Siblings,
 		LowNode:     lowNode,
-		LowIndex:    lowIndex,
 		LowSiblings: lowProof.Siblings,
 		Update:      false,
 	}, nil
@@ -132,17 +124,13 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	i, err := t.keyIndex(key)
-	if err != nil {
-		return nil, err
-	}
-	n, err := t.node(i)
+	n, err := t.node(key)
 	if err != nil {
 		return nil, err
 	}
 	oldValue := n.Value
 	n.Value = value
-	_, err = t.setNode(i, n)
+	_, err = t.setNode(n)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +142,7 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	proof, err := t.ProveIndex(i)
+	proof, err := t.ProveNode(n)
 	if err != nil {
 		return nil, err
 	}
@@ -167,21 +155,17 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 		Siblings:    proof.Siblings,
 		LowNode: &Node{
 			Key:     n.Key,
+			Index:   n.Index,
 			Value:   oldValue,
 			NextKey: n.NextKey,
 		},
-		LowIndex:    i,
 		LowSiblings: proof.Siblings,
 		Update:      true,
 	}, nil
 }
 
-func (t *TreeWriter) setKeyIndex(key *big.Int, index uint64) error {
-	return t.tx.Set(t.indexKey(key), new(big.Int).SetUint64(index).Bytes())
-}
-
-func (t *TreeWriter) setNode(index uint64, n *Node) ([]*big.Int, error) {
-	err := t.tx.Set(t.nodeKey(new(big.Int).SetUint64(index)), n.bytes())
+func (t *TreeWriter) setNode(n *Node) ([]*big.Int, error) {
+	err := t.tx.Set(t.nodeKey(n.Key), n.bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -190,11 +174,12 @@ func (t *TreeWriter) setNode(index uint64, n *Node) ([]*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = t.tx.Set(t.hashKey(index, t.levels), h.Bytes())
+	err = t.tx.Set(t.hashKey(n.Index, t.levels), h.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
+	index := n.Index
 	siblings := make([]*big.Int, t.levels)
 	for level := t.levels; level > 0; {
 		level--

@@ -1,7 +1,6 @@
 package db
 
 import (
-	"bytes"
 	"errors"
 	"io"
 
@@ -38,8 +37,8 @@ func (p *Pebble) Get(key []byte) ([]byte, error) {
 	return get(key, p.db)
 }
 
-func (p *Pebble) GetLT(key, limit []byte) ([]byte, []byte, error) {
-	return getLT(key, limit, p.db)
+func (p *Pebble) GetLT(key []byte) ([]byte, []byte, error) {
+	return getLT(key, p.db)
 }
 
 func (p *Pebble) Close() error {
@@ -57,8 +56,8 @@ func (p *pebbleTransaction) Get(key []byte) ([]byte, error) {
 	return get(key, p.batch)
 }
 
-func (p *pebbleTransaction) GetLT(key, limit []byte) ([]byte, []byte, error) {
-	return getLT(key, limit, p.batch)
+func (p *pebbleTransaction) GetLT(key []byte) ([]byte, []byte, error) {
+	return getLT(key, p.batch)
 }
 
 func (p *pebbleTransaction) Set(key []byte, value []byte) error {
@@ -103,7 +102,7 @@ func get(key []byte, g pebbleGetter) ([]byte, error) {
 	return ret, nil
 }
 
-func getLT(key, limit []byte, g pebbleGetter) ([]byte, []byte, error) {
+func getLT(key []byte, g pebbleGetter) ([]byte, []byte, error) {
 	iter, err := g.NewIter(&pebble.IterOptions{})
 	if err != nil {
 		return nil, nil, err
@@ -111,10 +110,7 @@ func getLT(key, limit []byte, g pebbleGetter) ([]byte, []byte, error) {
 	defer func() {
 		_ = iter.Close()
 	}()
-	if iter.SeekLTWithLimit(key, limit) != pebble.IterValid {
-		return nil, nil, nil
-	}
-	if bytes.Compare(iter.Key(), limit) < 0 {
+	if !iter.SeekLT(key) {
 		return nil, nil, nil
 	}
 	v, err := iter.ValueAndErr()
