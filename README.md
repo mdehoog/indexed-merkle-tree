@@ -194,5 +194,5 @@ The `db` package provides an interface for the indexed merkle tree to interact w
 provides an implementation of this interface using the `pebble` database.
 
 If you plan to share the database with other data, please be mindful of avoiding collisions with the data that the
-indexed merkle tree stores. In particular, do not store any keys that are prefixed with a `1` byte. This namespace
+indexed merkle tree stores. In particular, do not store any keys that are prefixed with a `0` byte. This namespace
 is reserved for the indexed merkle tree to ensure the low nullifier can be looked up correctly.

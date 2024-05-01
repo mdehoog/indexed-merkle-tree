@@ -7,10 +7,9 @@ import (
 	"github.com/mdehoog/indexed-merkle-tree/db"
 )
 
-const indexKeyPrefix = byte(1)
-const hashKeyPrefix = byte(2)
-const nodeKeyPrefix = byte(3)
-const sizeKeyPrefix = byte(4)
+const nodeKeyPrefix = byte(0)
+const hashKeyPrefix = byte(1)
+const sizeKeyPrefix = byte(2)
 
 var sizeKey = []byte{sizeKeyPrefix}
 
@@ -34,7 +33,7 @@ func (t *TreeReader) Root() (*big.Int, error) {
 	rootNodeBytes, err := t.reader.Get(t.hashKey(0, 0))
 	if errors.Is(err, db.ErrNotFound) {
 		// initial state: hash of empty node
-		initialHash, err := t.initialStateNode().hash(t.hash)
+		initialHash, err := initialStateNode().hash(t.hash)
 		if err != nil {
 			return nil, err
 		}
@@ -64,11 +63,7 @@ func (t *TreeReader) Size() (uint64, error) {
 }
 
 func (t *TreeReader) Get(key *big.Int) (*big.Int, error) {
-	i, err := t.keyIndex(key)
-	if err != nil {
-		return nil, err
-	}
-	n, err := t.node(i)
+	n, err := t.node(key)
 	if err != nil {
 		return nil, err
 	}
@@ -76,27 +71,22 @@ func (t *TreeReader) Get(key *big.Int) (*big.Int, error) {
 }
 
 func (t *TreeReader) ProveInclusion(key *big.Int) (*Proof, error) {
-	i, err := t.keyIndex(key)
+	n, err := t.node(key)
 	if err != nil {
 		return nil, err
 	}
-	return t.ProveIndex(i)
+	return t.nodeProof(n)
 }
 
 func (t *TreeReader) ProveExclusion(key *big.Int) (*Proof, error) {
-	i, err := t.lowNullifierIndex(key)
+	n, err := t.lowNullifierNode(key)
 	if err != nil {
 		return nil, err
 	}
-	return t.ProveIndex(i)
+	return t.nodeProof(n)
 }
 
-func (t *TreeReader) ProveIndex(index uint64) (*Proof, error) {
-	n, err := t.node(index)
-	if err != nil {
-		return nil, err
-	}
-
+func (t *TreeReader) nodeProof(n *Node) (*Proof, error) {
 	root, err := t.Root()
 	if err != nil {
 		return nil, err
@@ -105,13 +95,22 @@ func (t *TreeReader) ProveIndex(index uint64) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
+	siblings, err := t.proofSiblings(n)
+	if err != nil {
+		return nil, err
+	}
 	proof := &Proof{
 		Root:     root,
 		Size:     size,
-		Index:    index,
 		Node:     n,
-		Siblings: make([]*big.Int, t.levels),
+		Siblings: siblings,
 	}
+	return proof, nil
+}
+
+func (t *TreeReader) proofSiblings(n *Node) ([]*big.Int, error) {
+	siblings := make([]*big.Int, t.levels)
+	index := n.Index
 	for level := t.levels; level > 0; index /= 2 {
 		level--
 		siblingIndex := index + 1 - (index%2)*2
@@ -119,63 +118,35 @@ func (t *TreeReader) ProveIndex(index uint64) (*Proof, error) {
 		if err != nil && !errors.Is(err, db.ErrNotFound) {
 			return nil, err
 		}
-		proof.Siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
+		siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
 	}
-
-	return proof, nil
+	return siblings, nil
 }
 
-func (t *TreeReader) keyIndex(key *big.Int) (uint64, error) {
-	lt, err := t.reader.Get(t.indexKey(key))
-	if err != nil {
-		return 0, err
-	}
-	return new(big.Int).SetBytes(lt).Uint64(), nil
-}
-
-func (t *TreeReader) lowNullifierIndex(key *big.Int) (uint64, error) {
-	_, lt, err := t.reader.GetLT(t.indexKey(key), t.zeroIndexKey())
-	if err != nil {
-		return 0, err
-	}
-	return new(big.Int).SetBytes(lt).Uint64(), nil
-}
-
-func (t *TreeReader) node(index uint64) (*Node, error) {
-	b, err := t.reader.Get(t.nodeKey(new(big.Int).SetUint64(index)))
-	if errors.Is(err, db.ErrNotFound) && index == 0 {
-		// initial state
-		return t.initialStateNode(), nil
-	} else if err != nil {
-		return nil, err
-	}
-	n := &Node{}
-	err = n.fromBytes(b)
+func (t *TreeReader) node(key *big.Int) (*Node, error) {
+	b, err := t.reader.Get(t.nodeKey(key))
 	if err != nil {
 		return nil, err
 	}
-	return n, nil
+	return bytesToNode(key, b)
 }
 
-func (t *TreeReader) initialStateNode() *Node {
-	return &Node{
-		Key:     new(big.Int),
-		Value:   new(big.Int),
-		NextKey: new(big.Int),
+func (t *TreeReader) lowNullifierNode(key *big.Int) (*Node, error) {
+	k, b, err := t.reader.GetLT(t.nodeKey(key))
+	if err != nil {
+		return nil, err
 	}
+	if k == nil {
+		return initialStateNode(), nil
+	}
+	return bytesToNode(nodeKeyBytesToKey(k), b)
 }
 
-func (t *TreeReader) indexKey(key *big.Int) []byte {
+func (t *TreeReader) nodeKey(key *big.Int) []byte {
 	b := key.Bytes()
 	prefix := make([]byte, 1+int(t.feLen)-len(b))
-	prefix[0] = indexKeyPrefix
+	prefix[0] = nodeKeyPrefix
 	return append(prefix, b...)
-}
-
-func (t *TreeReader) zeroIndexKey() []byte {
-	b := make([]byte, 1+int(t.feLen))
-	b[0] = indexKeyPrefix
-	return b
 }
 
 func (t *TreeReader) hashKey(index, level uint64) []byte {
@@ -186,6 +157,6 @@ func (t *TreeReader) hashKey(index, level uint64) []byte {
 	return append([]byte{hashKeyPrefix}, position.Bytes()...)
 }
 
-func (t *TreeReader) nodeKey(key *big.Int) []byte {
-	return append([]byte{nodeKeyPrefix}, key.Bytes()...)
+func nodeKeyBytesToKey(b []byte) *big.Int {
+	return new(big.Int).SetBytes(b[1:])
 }

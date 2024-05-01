@@ -7,7 +7,6 @@ import (
 type Proof struct {
 	Root     *big.Int
 	Size     uint64
-	Index    uint64
 	Node     *Node
 	Siblings []*big.Int
 }
@@ -17,7 +16,7 @@ func (p *Proof) Valid(t *TreeReader) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	index := p.Index
+	index := p.Node.Index
 	for level := t.levels; level > 0; index /= 2 {
 		level--
 		if p.Siblings[level].Cmp(big.NewInt(0)) != 0 {
@@ -46,7 +45,6 @@ type MutateProof struct {
 	Node        *Node
 	Siblings    []*big.Int
 	LowNode     *Node // LowNode.Value == OldValue for updates
-	LowIndex    uint64
 	LowSiblings []*big.Int
 	Update      bool
 }
