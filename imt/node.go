@@ -15,7 +15,6 @@ type Node interface {
 	Value() *big.Int
 	NextKey() *big.Int
 	Hash(HashFn) (*big.Int, error)
-	Bytes() []byte
 }
 
 type node struct {
@@ -25,7 +24,9 @@ type node struct {
 	nextKey *big.Int
 }
 
-func initialStateNode() Node {
+var _ Node = &node{}
+
+func initialStateNode() *node {
 	return &node{
 		key:     new(big.Int),
 		index:   0,
@@ -34,7 +35,7 @@ func initialStateNode() Node {
 	}
 }
 
-func bytesToNode(key *big.Int, b []byte) (Node, error) {
+func fromBytes(key *big.Int, b []byte) (*node, error) {
 	n := &node{
 		key: key,
 	}
@@ -75,7 +76,7 @@ func (n *node) Hash(fn HashFn) (*big.Int, error) {
 	return fn([]*big.Int{n.key, n.value, n.nextKey})
 }
 
-func (n *node) Bytes() []byte {
+func (n *node) bytes() []byte {
 	var b []byte
 	b = binary.BigEndian.AppendUint64(b, n.index)
 	vb := n.value.Bytes()

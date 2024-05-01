@@ -171,8 +171,8 @@ func (t *treeWriter) Update(key, value *big.Int) (MutateProof, error) {
 	}, nil
 }
 
-func (t *treeWriter) setNode(n Node) ([]*big.Int, error) {
-	err := t.tx.Set(t.nodeKey(n.Key()), n.Bytes())
+func (t *treeWriter) setNode(n *node) ([]*big.Int, error) {
+	err := t.tx.Set(t.nodeKey(n.Key()), n.bytes())
 	if err != nil {
 		return nil, err
 	}

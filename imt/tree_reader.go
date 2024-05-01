@@ -140,15 +140,15 @@ func (t *treeReader) proveSiblings(n Node) ([]*big.Int, error) {
 	return siblings, nil
 }
 
-func (t *treeReader) node(key *big.Int) (Node, error) {
+func (t *treeReader) node(key *big.Int) (*node, error) {
 	b, err := t.reader.Get(t.nodeKey(key))
 	if err != nil {
 		return nil, err
 	}
-	return bytesToNode(key, b)
+	return fromBytes(key, b)
 }
 
-func (t *treeReader) lowNullifierNode(key *big.Int) (Node, error) {
+func (t *treeReader) lowNullifierNode(key *big.Int) (*node, error) {
 	k, b, err := t.reader.GetLT(t.nodeKey(key))
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (t *treeReader) lowNullifierNode(key *big.Int) (Node, error) {
 	if k == nil {
 		return initialStateNode(), nil
 	}
-	return bytesToNode(nodeKeyBytesToKey(k), b)
+	return fromBytes(nodeKeyBytesToKey(k), b)
 }
 
 func (t *treeReader) nodeKey(key *big.Int) []byte {
