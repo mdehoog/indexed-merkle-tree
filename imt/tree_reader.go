@@ -13,15 +13,25 @@ const sizeKeyPrefix = byte(2)
 
 var sizeKey = []byte{sizeKeyPrefix}
 
-type TreeReader struct {
+type TreeReader interface {
+	Hash([]*big.Int) (*big.Int, error)
+	Levels() uint64
+	Root() (*big.Int, error)
+	Size() (uint64, error)
+	Get(key *big.Int) (*big.Int, error)
+	ProveInclusion(key *big.Int) (Proof, error)
+	ProveExclusion(key *big.Int) (Proof, error)
+}
+
+type treeReader struct {
 	reader db.Reader
 	levels uint64
 	feLen  uint64
 	hash   HashFn
 }
 
-func NewTreeReader(reader db.Reader, levels, feLen uint64, hash HashFn) *TreeReader {
-	return &TreeReader{
+func NewTreeReader(reader db.Reader, levels, feLen uint64, hash HashFn) TreeReader {
+	return &treeReader{
 		reader: reader,
 		levels: levels,
 		feLen:  feLen,
@@ -29,11 +39,19 @@ func NewTreeReader(reader db.Reader, levels, feLen uint64, hash HashFn) *TreeRea
 	}
 }
 
-func (t *TreeReader) Root() (*big.Int, error) {
+func (t *treeReader) Hash(i []*big.Int) (*big.Int, error) {
+	return t.hash(i)
+}
+
+func (t *treeReader) Levels() uint64 {
+	return t.levels
+}
+
+func (t *treeReader) Root() (*big.Int, error) {
 	rootNodeBytes, err := t.reader.Get(t.hashKey(0, 0))
 	if errors.Is(err, db.ErrNotFound) {
 		// initial state: hash of empty node
-		initialHash, err := initialStateNode().hash(t.hash)
+		initialHash, err := initialStateNode().Hash(t.hash)
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +68,7 @@ func (t *TreeReader) Root() (*big.Int, error) {
 	return t.hash([]*big.Int{new(big.Int).SetBytes(rootNodeBytes), new(big.Int).SetUint64(size)})
 }
 
-func (t *TreeReader) Size() (uint64, error) {
+func (t *treeReader) Size() (uint64, error) {
 	s, err := t.reader.Get(sizeKey)
 	if err == nil {
 		b := new(big.Int).SetBytes(s).Uint64()
@@ -62,31 +80,31 @@ func (t *TreeReader) Size() (uint64, error) {
 	}
 }
 
-func (t *TreeReader) Get(key *big.Int) (*big.Int, error) {
+func (t *treeReader) Get(key *big.Int) (*big.Int, error) {
 	n, err := t.node(key)
 	if err != nil {
 		return nil, err
 	}
-	return n.Value, nil
+	return n.Value(), nil
 }
 
-func (t *TreeReader) ProveInclusion(key *big.Int) (*Proof, error) {
+func (t *treeReader) ProveInclusion(key *big.Int) (Proof, error) {
 	n, err := t.node(key)
 	if err != nil {
 		return nil, err
 	}
-	return t.nodeProof(n)
+	return t.proveNode(n)
 }
 
-func (t *TreeReader) ProveExclusion(key *big.Int) (*Proof, error) {
+func (t *treeReader) ProveExclusion(key *big.Int) (Proof, error) {
 	n, err := t.lowNullifierNode(key)
 	if err != nil {
 		return nil, err
 	}
-	return t.nodeProof(n)
+	return t.proveNode(n)
 }
 
-func (t *TreeReader) nodeProof(n *Node) (*Proof, error) {
+func (t *treeReader) proveNode(n Node) (Proof, error) {
 	root, err := t.Root()
 	if err != nil {
 		return nil, err
@@ -95,22 +113,21 @@ func (t *TreeReader) nodeProof(n *Node) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
-	siblings, err := t.proofSiblings(n)
+	siblings, err := t.proveSiblings(n)
 	if err != nil {
 		return nil, err
 	}
-	proof := &Proof{
-		Root:     root,
-		Size:     size,
-		Node:     n,
-		Siblings: siblings,
-	}
-	return proof, nil
+	return &proof{
+		root:     root,
+		size:     size,
+		node:     n,
+		siblings: siblings,
+	}, nil
 }
 
-func (t *TreeReader) proofSiblings(n *Node) ([]*big.Int, error) {
+func (t *treeReader) proveSiblings(n Node) ([]*big.Int, error) {
 	siblings := make([]*big.Int, t.levels)
-	index := n.Index
+	index := n.Index()
 	for level := t.levels; level > 0; index /= 2 {
 		level--
 		siblingIndex := index + 1 - (index%2)*2
@@ -123,7 +140,7 @@ func (t *TreeReader) proofSiblings(n *Node) ([]*big.Int, error) {
 	return siblings, nil
 }
 
-func (t *TreeReader) node(key *big.Int) (*Node, error) {
+func (t *treeReader) node(key *big.Int) (Node, error) {
 	b, err := t.reader.Get(t.nodeKey(key))
 	if err != nil {
 		return nil, err
@@ -131,7 +148,7 @@ func (t *TreeReader) node(key *big.Int) (*Node, error) {
 	return bytesToNode(key, b)
 }
 
-func (t *TreeReader) lowNullifierNode(key *big.Int) (*Node, error) {
+func (t *treeReader) lowNullifierNode(key *big.Int) (Node, error) {
 	k, b, err := t.reader.GetLT(t.nodeKey(key))
 	if err != nil {
 		return nil, err
@@ -142,14 +159,14 @@ func (t *TreeReader) lowNullifierNode(key *big.Int) (*Node, error) {
 	return bytesToNode(nodeKeyBytesToKey(k), b)
 }
 
-func (t *TreeReader) nodeKey(key *big.Int) []byte {
+func (t *treeReader) nodeKey(key *big.Int) []byte {
 	b := key.Bytes()
 	prefix := make([]byte, 1+int(t.feLen)-len(b))
 	prefix[0] = nodeKeyPrefix
 	return append(prefix, b...)
 }
 
-func (t *TreeReader) hashKey(index, level uint64) []byte {
+func (t *treeReader) hashKey(index, level uint64) []byte {
 	one := big.NewInt(1)
 	position := new(big.Int).Lsh(one, uint(t.levels+1))
 	position.Sub(position, new(big.Int).Lsh(one, uint(level+1)))

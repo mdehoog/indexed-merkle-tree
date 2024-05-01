@@ -7,17 +7,22 @@ import (
 	"github.com/mdehoog/indexed-merkle-tree/db"
 )
 
-type HashFn func([]*big.Int) (*big.Int, error)
-
-type TreeWriter struct {
+type TreeWriter interface {
 	TreeReader
+	Set(key, value *big.Int) (MutateProof, error)
+	Insert(key, value *big.Int) (MutateProof, error)
+	Update(key, value *big.Int) (MutateProof, error)
+}
+
+type treeWriter struct {
+	*treeReader
 	tx db.Transaction
 }
 
-func NewTreeWriter(tx db.Transaction, levels, feLen uint64, hash HashFn) *TreeWriter {
-	return &TreeWriter{
+func NewTreeWriter(tx db.Transaction, levels, feLen uint64, hash HashFn) TreeWriter {
+	return &treeWriter{
 		tx: tx,
-		TreeReader: TreeReader{
+		treeReader: &treeReader{
 			reader: tx,
 			levels: levels,
 			feLen:  feLen,
@@ -26,11 +31,11 @@ func NewTreeWriter(tx db.Transaction, levels, feLen uint64, hash HashFn) *TreeWr
 	}
 }
 
-func (t *TreeWriter) setSize(s uint64) error {
+func (t *treeWriter) setSize(s uint64) error {
 	return t.tx.Set(sizeKey, new(big.Int).SetUint64(s).Bytes())
 }
 
-func (t *TreeWriter) Set(key, value *big.Int) (*MutateProof, error) {
+func (t *treeWriter) Set(key, value *big.Int) (MutateProof, error) {
 	_, err := t.Get(key)
 	insert := errors.Is(err, db.ErrNotFound)
 	if err != nil && !insert {
@@ -42,7 +47,7 @@ func (t *TreeWriter) Set(key, value *big.Int) (*MutateProof, error) {
 	return t.Update(key, value)
 }
 
-func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
+func (t *treeWriter) Insert(key, value *big.Int) (MutateProof, error) {
 	_, err := t.tx.Get(t.nodeKey(key))
 	if err == nil {
 		return nil, errors.New("key already exists")
@@ -55,7 +60,7 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 		return nil, err
 	}
 
-	oldSiblings, err := t.proofSiblings(lowNode)
+	oldSiblings, err := t.proveSiblings(lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -76,18 +81,23 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 		return nil, err
 	}
 
-	newNode := &Node{
-		Key:     key,
-		Index:   size,
-		Value:   value,
-		NextKey: lowNode.NextKey,
+	newNode := &node{
+		key:     key,
+		index:   size,
+		value:   value,
+		nextKey: lowNode.NextKey(),
 	}
 	_, err = t.setNode(newNode)
 	if err != nil {
 		return nil, err
 	}
 
-	lowNode.NextKey = key
+	lowNode = &node{
+		key:     lowNode.Key(),
+		index:   lowNode.Index(),
+		value:   lowNode.Value(),
+		nextKey: key,
+	}
 	lowSiblings, err := t.setNode(lowNode)
 	if err != nil {
 		return nil, err
@@ -97,25 +107,25 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	siblings, err := t.proofSiblings(newNode)
+	siblings, err := t.proveSiblings(newNode)
 	if err != nil {
 		return nil, err
 	}
 
-	return &MutateProof{
-		OldRoot:     oldRoot,
-		OldSize:     size - 1,
-		OldSiblings: oldSiblings,
-		NewRoot:     newRoot,
-		Node:        newNode,
-		Siblings:    siblings,
-		LowNode:     lowNode,
-		LowSiblings: lowSiblings,
-		Update:      false,
+	return &mutateProof{
+		oldRoot:     oldRoot,
+		oldSize:     size - 1,
+		oldSiblings: oldSiblings,
+		newRoot:     newRoot,
+		node:        newNode,
+		siblings:    siblings,
+		lowNode:     lowNode,
+		lowSiblings: lowSiblings,
+		update:      false,
 	}, nil
 }
 
-func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
+func (t *treeWriter) Update(key, value *big.Int) (MutateProof, error) {
 	oldRoot, err := t.Root()
 	if err != nil {
 		return nil, err
@@ -124,8 +134,13 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	oldValue := n.Value
-	n.Value = value
+	oldValue := n.Value()
+	n = &node{
+		key:     key,
+		index:   n.Index(),
+		value:   value,
+		nextKey: n.NextKey(),
+	}
 	siblings, err := t.setNode(n)
 	if err != nil {
 		return nil, err
@@ -138,40 +153,40 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MutateProof{
-		OldRoot:     oldRoot,
-		OldSize:     size,
-		OldSiblings: siblings,
-		NewRoot:     newRoot,
-		Node:        n,
-		Siblings:    siblings,
-		LowNode: &Node{
-			Key:     n.Key,
-			Index:   n.Index,
-			Value:   oldValue,
-			NextKey: n.NextKey,
+	return &mutateProof{
+		oldRoot:     oldRoot,
+		oldSize:     size,
+		oldSiblings: siblings,
+		newRoot:     newRoot,
+		node:        n,
+		siblings:    siblings,
+		lowNode: &node{
+			key:     n.Key(),
+			index:   n.Index(),
+			value:   oldValue,
+			nextKey: n.NextKey(),
 		},
-		LowSiblings: siblings,
-		Update:      true,
+		lowSiblings: siblings,
+		update:      true,
 	}, nil
 }
 
-func (t *TreeWriter) setNode(n *Node) ([]*big.Int, error) {
-	err := t.tx.Set(t.nodeKey(n.Key), n.bytes())
+func (t *treeWriter) setNode(n Node) ([]*big.Int, error) {
+	err := t.tx.Set(t.nodeKey(n.Key()), n.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	h, err := n.hash(t.hash)
+	h, err := n.Hash(t.hash)
 	if err != nil {
 		return nil, err
 	}
-	err = t.tx.Set(t.hashKey(n.Index, t.levels), h.Bytes())
+	err = t.tx.Set(t.hashKey(n.Index(), t.levels), h.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	index := n.Index
+	index := n.Index()
 	siblings := make([]*big.Int, t.levels)
 	for level := t.levels; level > 0; {
 		level--
