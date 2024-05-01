@@ -75,7 +75,7 @@ func (t *TreeReader) ProveInclusion(key *big.Int) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.ProveNode(n)
+	return t.nodeProof(n)
 }
 
 func (t *TreeReader) ProveExclusion(key *big.Int) (*Proof, error) {
@@ -83,10 +83,10 @@ func (t *TreeReader) ProveExclusion(key *big.Int) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
-	return t.ProveNode(n)
+	return t.nodeProof(n)
 }
 
-func (t *TreeReader) ProveNode(n *Node) (*Proof, error) {
+func (t *TreeReader) nodeProof(n *Node) (*Proof, error) {
 	root, err := t.Root()
 	if err != nil {
 		return nil, err
@@ -95,12 +95,21 @@ func (t *TreeReader) ProveNode(n *Node) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
+	siblings, err := t.proofSiblings(n)
+	if err != nil {
+		return nil, err
+	}
 	proof := &Proof{
 		Root:     root,
 		Size:     size,
 		Node:     n,
-		Siblings: make([]*big.Int, t.levels),
+		Siblings: siblings,
 	}
+	return proof, nil
+}
+
+func (t *TreeReader) proofSiblings(n *Node) ([]*big.Int, error) {
+	siblings := make([]*big.Int, t.levels)
 	index := n.Index
 	for level := t.levels; level > 0; index /= 2 {
 		level--
@@ -109,10 +118,9 @@ func (t *TreeReader) ProveNode(n *Node) (*Proof, error) {
 		if err != nil && !errors.Is(err, db.ErrNotFound) {
 			return nil, err
 		}
-		proof.Siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
+		siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
 	}
-
-	return proof, nil
+	return siblings, nil
 }
 
 func (t *TreeReader) node(key *big.Int) (*Node, error) {

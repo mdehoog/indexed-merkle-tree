@@ -55,7 +55,7 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 		return nil, err
 	}
 
-	oldProof, err := t.ProveNode(lowNode)
+	oldSiblings, err := t.proofSiblings(lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	}
 
 	lowNode.NextKey = key
-	_, err = t.setNode(lowNode)
+	lowSiblings, err := t.setNode(lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,7 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	proof, err := t.ProveNode(newNode)
-	if err != nil {
-		return nil, err
-	}
-	lowProof, err := t.ProveNode(lowNode)
+	siblings, err := t.proofSiblings(newNode)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +105,12 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	return &MutateProof{
 		OldRoot:     oldRoot,
 		OldSize:     size - 1,
-		OldSiblings: oldProof.Siblings,
+		OldSiblings: oldSiblings,
 		NewRoot:     newRoot,
 		Node:        newNode,
-		Siblings:    proof.Siblings,
+		Siblings:    siblings,
 		LowNode:     lowNode,
-		LowSiblings: lowProof.Siblings,
+		LowSiblings: lowSiblings,
 		Update:      false,
 	}, nil
 }
@@ -130,7 +126,7 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	}
 	oldValue := n.Value
 	n.Value = value
-	_, err = t.setNode(n)
+	siblings, err := t.setNode(n)
 	if err != nil {
 		return nil, err
 	}
@@ -142,24 +138,20 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	proof, err := t.ProveNode(n)
-	if err != nil {
-		return nil, err
-	}
 	return &MutateProof{
 		OldRoot:     oldRoot,
 		OldSize:     size,
-		OldSiblings: proof.Siblings,
+		OldSiblings: siblings,
 		NewRoot:     newRoot,
 		Node:        n,
-		Siblings:    proof.Siblings,
+		Siblings:    siblings,
 		LowNode: &Node{
 			Key:     n.Key,
 			Index:   n.Index,
 			Value:   oldValue,
 			NextKey: n.NextKey,
 		},
-		LowSiblings: proof.Siblings,
+		LowSiblings: siblings,
 		Update:      true,
 	}, nil
 }
