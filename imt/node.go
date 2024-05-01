@@ -23,11 +23,23 @@ func initialStateNode() *Node {
 }
 
 func bytesToNode(key *big.Int, b []byte) (*Node, error) {
-	n := &Node{}
-	err := n.fromBytes(key, b)
-	if err != nil {
-		return nil, err
+	n := &Node{
+		Key: key,
 	}
+	if len(b) < 8 {
+		return nil, errors.New("invalid bytes")
+	}
+	n.Index = binary.BigEndian.Uint64(b)
+	b = b[8:]
+	if len(b) < 1 {
+		return nil, errors.New("invalid bytes")
+	}
+	n.Value = new(big.Int).SetBytes(b[1 : 1+b[0]])
+	b = b[1+b[0]:]
+	if len(b) < 1 {
+		return nil, errors.New("invalid bytes")
+	}
+	n.NextKey = new(big.Int).SetBytes(b[1 : 1+b[0]])
 	return n, nil
 }
 
@@ -40,25 +52,6 @@ func (n *Node) bytes() []byte {
 	nkb := n.NextKey.Bytes()
 	b = append(b, byte(len(nkb)))
 	return append(b, nkb...)
-}
-
-func (n *Node) fromBytes(key *big.Int, b []byte) error {
-	n.Key = key
-	if len(b) < 8 {
-		return errors.New("invalid bytes")
-	}
-	n.Index = binary.BigEndian.Uint64(b)
-	b = b[8:]
-	if len(b) < 1 {
-		return errors.New("invalid bytes")
-	}
-	n.Value = new(big.Int).SetBytes(b[1 : 1+b[0]])
-	b = b[1+b[0]:]
-	if len(b) < 1 {
-		return errors.New("invalid bytes")
-	}
-	n.NextKey = new(big.Int).SetBytes(b[1 : 1+b[0]])
-	return nil
 }
 
 func (n *Node) hash(h HashFn) (*big.Int, error) {
