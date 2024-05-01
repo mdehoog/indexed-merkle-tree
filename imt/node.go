@@ -7,7 +7,6 @@ import (
 )
 
 type Node struct {
-	Key     *big.Int
 	Index   uint64
 	Value   *big.Int
 	NextKey *big.Int
@@ -15,17 +14,14 @@ type Node struct {
 
 func initialStateNode() *Node {
 	return &Node{
-		Key:     new(big.Int),
 		Index:   0,
 		Value:   new(big.Int),
 		NextKey: new(big.Int),
 	}
 }
 
-func bytesToNode(key *big.Int, b []byte) (*Node, error) {
-	n := &Node{
-		Key: key,
-	}
+func bytesToNode(b []byte) (*Node, error) {
+	n := &Node{}
 	if len(b) < 8 {
 		return nil, errors.New("invalid bytes")
 	}
@@ -54,6 +50,6 @@ func (n *Node) bytes() []byte {
 	return append(b, nkb...)
 }
 
-func (n *Node) hash(h HashFn) (*big.Int, error) {
-	return h([]*big.Int{n.Key, n.Value, n.NextKey})
+func (n *Node) hash(key *big.Int, h HashFn) (*big.Int, error) {
+	return h([]*big.Int{key, n.Value, n.NextKey})
 }

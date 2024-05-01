@@ -7,12 +7,13 @@ import (
 type Proof struct {
 	Root     *big.Int
 	Size     uint64
+	Key      *big.Int
 	Node     *Node
 	Siblings []*big.Int
 }
 
 func (p *Proof) Valid(t *TreeReader) (bool, error) {
-	h, err := p.Node.hash(t.hash)
+	h, err := p.Node.hash(p.Key, t.hash)
 	if err != nil {
 		return false, err
 	}
@@ -42,8 +43,10 @@ type MutateProof struct {
 	OldSize     uint64
 	OldSiblings []*big.Int
 	NewRoot     *big.Int
+	Key         *big.Int
 	Node        *Node
 	Siblings    []*big.Int
+	LowKey      *big.Int
 	LowNode     *Node // LowNode.Value == OldValue for updates
 	LowSiblings []*big.Int
 	Update      bool

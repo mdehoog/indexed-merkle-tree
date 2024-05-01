@@ -50,7 +50,7 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 		return nil, err
 	}
 
-	lowNode, err := t.lowNullifierNode(key)
+	lowKey, lowNode, err := t.lowNullifierNode(key)
 	if err != nil {
 		return nil, err
 	}
@@ -77,18 +77,17 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 	}
 
 	newNode := &Node{
-		Key:     key,
 		Index:   size,
 		Value:   value,
 		NextKey: lowNode.NextKey,
 	}
-	_, err = t.setNode(newNode)
+	_, err = t.setNode(key, newNode)
 	if err != nil {
 		return nil, err
 	}
 
 	lowNode.NextKey = key
-	lowSiblings, err := t.setNode(lowNode)
+	lowSiblings, err := t.setNode(lowKey, lowNode)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +106,10 @@ func (t *TreeWriter) Insert(key, value *big.Int) (*MutateProof, error) {
 		OldSize:     size - 1,
 		OldSiblings: oldSiblings,
 		NewRoot:     newRoot,
+		Key:         key,
 		Node:        newNode,
 		Siblings:    siblings,
+		LowKey:      lowKey,
 		LowNode:     lowNode,
 		LowSiblings: lowSiblings,
 		Update:      false,
@@ -126,7 +127,7 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	}
 	oldValue := n.Value
 	n.Value = value
-	siblings, err := t.setNode(n)
+	siblings, err := t.setNode(key, n)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +144,11 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 		OldSize:     size,
 		OldSiblings: siblings,
 		NewRoot:     newRoot,
+		Key:         key,
 		Node:        n,
 		Siblings:    siblings,
+		LowKey:      key,
 		LowNode: &Node{
-			Key:     n.Key,
 			Index:   n.Index,
 			Value:   oldValue,
 			NextKey: n.NextKey,
@@ -156,13 +158,13 @@ func (t *TreeWriter) Update(key, value *big.Int) (*MutateProof, error) {
 	}, nil
 }
 
-func (t *TreeWriter) setNode(n *Node) ([]*big.Int, error) {
-	err := t.tx.Set(t.nodeKey(n.Key), n.bytes())
+func (t *TreeWriter) setNode(key *big.Int, n *Node) ([]*big.Int, error) {
+	err := t.tx.Set(t.nodeKey(key), n.bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	h, err := n.hash(t.hash)
+	h, err := n.hash(key, t.hash)
 	if err != nil {
 		return nil, err
 	}
