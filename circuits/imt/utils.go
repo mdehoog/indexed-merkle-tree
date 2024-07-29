@@ -14,7 +14,7 @@ func assertDifferentIfEnabled(api frontend.API, a, b, enabled frontend.Variable)
 }
 
 func hashSwitcher(api frontend.API, indexBit, hash, sibling frontend.Variable) frontend.Variable {
-	l := api.Select(indexBit, hash, sibling)
-	r := api.Select(indexBit, sibling, hash)
+	l := api.Select(indexBit, sibling, hash)
+	r := api.Select(indexBit, hash, sibling)
 	return api.Select(api.IsZero(sibling), hash, poseidon.Hash(api, []frontend.Variable{l, r}))
 }
