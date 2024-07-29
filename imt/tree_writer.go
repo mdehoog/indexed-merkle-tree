@@ -195,9 +195,9 @@ func (t *treeWriter) setNode(n *node) ([]*big.Int, error) {
 		siblings[level] = new(big.Int).SetBytes(siblingHashBytes)
 		if err == nil {
 			if index%2 == 0 {
-				h, err = t.hash([]*big.Int{siblings[level], h})
-			} else {
 				h, err = t.hash([]*big.Int{h, siblings[level]})
+			} else {
+				h, err = t.hash([]*big.Int{siblings[level], h})
 			}
 			if err != nil {
 				return nil, err

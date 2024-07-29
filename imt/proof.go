@@ -48,9 +48,9 @@ func (p *proof) Valid(t TreeReader) (bool, error) {
 		level--
 		if p.siblings[level].Cmp(big.NewInt(0)) != 0 {
 			if index%2 == 0 {
-				h, err = t.Hash([]*big.Int{p.siblings[level], h})
-			} else {
 				h, err = t.Hash([]*big.Int{h, p.siblings[level]})
+			} else {
+				h, err = t.Hash([]*big.Int{p.siblings[level], h})
 			}
 			if err != nil {
 				return false, err
